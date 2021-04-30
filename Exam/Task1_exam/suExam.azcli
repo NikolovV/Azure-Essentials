@@ -1,0 +1,43 @@
+az login
+
+az account set --subscription Pay-As-You-Go
+
+az group create -n RG-Exam -l westeurope
+
+az network vnet create -n VN-Net -g RG-Exam -l westeurope --address-prefixes 20.0.0.0/16
+
+az network nsg create -n SG-FE -g RG-Exam -l westeurope
+az network nsg rule create -n Port_22 --nsg-name SG-FE -g RG-Exam --access Allow --protocol Tcp --direction Inbound --priority 100 --destination-port-ranges 22
+az network nsg rule create -n Port_80 --nsg-name SG-FE -g RG-Exam --access Allow --protocol Tcp --direction Inbound --priority 110 --destination-port-ranges 80
+
+az network nsg create -n SG-BE -g RG-Exam -l westeurope
+az network nsg rule create -n Port_22 --nsg-name SG-BE -g RG-Exam --access Allow --protocol Tcp --direction Inbound --priority 100 --destination-port-ranges 22
+az network nsg rule create -n Port_9000 --nsg-name SG-BE -g RG-Exam --access Allow --protocol Tcp --direction Inbound --priority 110 --destination-port-ranges 9000
+
+az network vnet subnet create -n SN-FE --vnet-name VN-Net -g RG-Exam --address-prefixes 20.0.0.0/24 --network-security-group SG-FE
+az network vnet subnet create -n SN-BE --vnet-name VN-Net -g RG-Exam --address-prefixes 20.0.1.0/24 --network-security-group SG-BE
+
+az network public-ip create -n PIP -g RG-Exam -l westeurope --allocation-method dynamic
+
+az network lb create -n LB-EXT -g RG-Exam -l westeurope --sku Basic --frontend-ip-name lbex-fe --backend-pool-name lbex-be --public-ip-address PIP
+az network lb probe create -n lbex-hp --lb-name LB-EXT -g RG-Exam --protocol tcp --port 80
+az network lb rule create -n lbex-rule --lb-name LB-EXT -g RG-Exam --protocol tcp --frontend-port 80 --backend-port 80 --frontend-ip-name lbex-fe --backend-pool-name lbex-be --probe-name lbex-hp
+
+az network lb create -n LB-INT -g RG-Exam -l westeurope --sku Basic --frontend-ip-name lbi-fe --private-ip-address 20.0.0.254 --backend-pool-name lbi-be --vnet-name VN-Net --subnet SN-FE
+az network lb probe create -n lbi-hp --lb-name LB-INT -g RG-Exam --protocol tcp --port 9000
+az network lb rule create -n lbi-rule --lb-name LB-INT -g RG-Exam --protocol tcp --frontend-port 9000 --backend-port 9000 --frontend-ip-name lbi-fe --backend-pool-name lbi-be --probe-name lbi-hp
+
+az sql server create -n vnexamsqlsrv -g RG-Exam -l westeurope --admin-user demouserdb --admin-password DemoPasswordDB-2021 --no-wait
+az sql server firewall-rule create -g RG-Exam --server vnexamsqlsrv -n allowip --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+az sql db create -g RG-Exam --server vnexamsqlsrv --name vnexamdb --edition Basic --capacity 5 --zone-redundant false --no-wait
+
+######### VMSS ###########
+cd cloud-init
+az vmss create -g RG-Exam -l westeurope --name HA-FE --image UbuntuLTS --vm-sku Standard_B1s --storage-sku Standard_LRS --instance-count 2 --upgrade-policy-mode automatic --custom-data azcli-fe-cloud-init.yaml --lb LB-EXT --authentication-type password --admin-username demouser --admin-password DemoPassword-2021 --vnet-name VN-Net --subnet SN-FE --nsg SG-FE --no-wait
+az vmss create -g RG-Exam -l westeurope --name HA-BE --image UbuntuLTS --vm-sku Standard_B1s --storage-sku Standard_LRS --instance-count 2 --upgrade-policy-mode automatic --custom-data azcli-be-cloud-init.yaml --lb LB-INT --authentication-type password --admin-username demouser --admin-password DemoPassword-2021 --vnet-name VN-Net --subnet SN-BE --nsg SG-BE --no-wait
+az vmss delete -g RG-Exam -n HA-FE --no-wait
+az vmss delete -g RG-Exam -n HA-BE --no-wait
+####################
+
+az group delete -g RG-Exam -y --no-wait
+az group delete -g NetworkWatcherRG -y --no-wait

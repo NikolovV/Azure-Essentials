@@ -1,0 +1,77 @@
+{
+    "persondata": [
+        {
+            "id": 1,
+            "name": "Pesho",
+            "sex": "male",
+            "salary": 700
+        },
+        {
+            "id": 2,
+            "name": "Tosho",
+            "sex": "male",
+            "salary": 900
+        },
+        {
+            "id": 3,
+            "name": "Gosho",
+            "sex": "male",
+            "salary": 1000
+        },
+        {
+            "id": 4,
+            "name": "Gosho",
+            "sex": "male",
+            "salary": 1200
+        },
+        {
+            "id": 5,
+            "name": "Minko",
+            "sex": "female",
+            "salary": 1400
+        },
+        {
+            "id": 6,
+            "name": "Stavri",
+            "sex": "male",
+            "salary": 1900
+        },
+        {
+            "id": 7,
+            "name": "Minka",
+            "sex": "female",
+            "salary": 700
+        },
+        {
+            "id": 8,
+            "name": "Kameliq",
+            "sex": "female",
+            "salary": 900
+        },
+        {
+            "id": 9,
+            "name": "Todorka",
+            "sex": "female",
+            "salary": 1000
+        },
+        {
+            "id": 10,
+            "name": "Ginka",
+            "sex": "female",
+            "salary": 1200
+        },
+        {
+            "id": 11,
+            "name": "Evdokia",
+            "sex": "female",
+            "salary": 1400
+        },
+        {
+            "id": 12,
+            "name": "Stela",
+            "sex": "female",
+            "salary": 1900
+        }        
+    ]
+
+}

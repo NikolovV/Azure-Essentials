@@ -1,0 +1,45 @@
+az login
+
+az account set --subscription Pay-As-You-Go
+
+az group create -n RG-SolutionB -l westeurope
+
+az acr create -g RG-SolutionB -l westeurope -n vnsusolacr --sku Basic --admin-enabled true --public-network-enabled true
+
+az acr login -n vnsusolacr
+
+az aks create -g RG-SolutionB -l westeurope -n vnsusolk8s --node-count 1 --node-vm-size Standard_B2s --enable-addons monitoring --generate-ssh-keys --attach-acr vnsusolacr --load-balancer-sku basic
+
+az aks get-credentials -g RG-SolutionB -n vnsusolk8s
+
+kubectl cluster-info
+
+az sql server create -n vnsolsqlsrv -g RG-SolutionB -l westeurope --admin-user demouserdb --admin-password DemoPasswordDB-2021 --no-wait
+az sql server firewall-rule create -g RG-SolutionB --server vnsolsqlsrv -n allowip --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+az sql db create -g RG-SolutionB --server vnsolsqlsrv --name vnsolsqldb --edition Basic --capacity 5 --zone-redundant false --no-wait
+
+docker build . -t examapp
+
+docker run -d --name webapp -p 8000:80 examapp
+
+docker container rm webapp --force
+
+docker tag examapp vnsusolacr.azurecr.io/examapp:latest
+
+docker push vnsusolacr.azurecr.io/examapp:latest
+
+az acr repository list -n vnsusolacr -o table
+
+cd .\manifests
+
+kubectl apply -f service.yaml -f deployment.yaml
+
+kubectl get svc,pod
+
+kubectl describe deployment examapp
+
+az webapp up -g RG-SolutionB -l westeurope -n vnsolphpwebapp --os-type Windows --plan win-plan --sku F1 --runtime PHP:7.4
+
+az group delete -g RG-SolutionB -y --no-wait
+az group delete -g NetworkWatcherRG -y --no-wait
+az group delete -g DefaultResourceGroup-WEU -y --no-wait

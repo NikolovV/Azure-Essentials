@@ -1,0 +1,112 @@
+#cloud-config
+package_upgrade: true
+packages:
+  - php-fpm
+  - gcc 
+  - g++
+  - make
+  - autoconf
+  - libc-dev
+  - pkg-config
+  - php-pear
+  - php-dev
+runcmd:
+  - [ wget, "https://packages.microsoft.com/keys/microsoft.asc", -O, /tmp/microsoft.asc ]
+  - apt-key add /tmp/microsoft.asc
+  - [ wget, "https://packages.microsoft.com/config/ubuntu/18.04/prod.list", -O, /etc/apt/sources.list.d/mssql-release.list ]
+  - apt-get update
+  - env ACCEPT_EULA=Y apt-get install -y msodbcsql17 mssql-tools unixodbc-dev
+  - pecl install sqlsrv-5.8.1
+  - pecl install pdo_sqlsrv-5.8.1
+  - echo extension=sqlsrv.so > /etc/php/7.2/mods-available/sqlsrv.ini
+  - echo extension=pdo_sqlsrv.so > /etc/php/7.2/mods-available/pdo_sqlsrv.ini
+  - phpenmod sqlsrv pdo_sqlsrv
+  - sed -i.bak 's@listen = /run/php/php7.2-fpm.sock@listen = 9000@g' /etc/php/7.2/fpm/pool.d/www.conf
+  - systemctl restart php7.2-fpm
+write_files:
+  - owner: www-data:www-data
+    path: /site/index.php
+    content: |
+      <h1>Voting Time! Which one you like most?</h1>
+      <?php
+      // put the connection string here
+      $connectionInfo = array("UID" => "demouserdb", "pwd" => "DemoPasswordDB-2021", "Database" => "vnexamdb", "LoginTimeout" => 30, "Encrypt" => 1, "TrustServerCertificate" => 0);
+      $serverName = "tcp:vnexamsqlsrv.database.windows.net,1433";
+      $conn = sqlsrv_connect($serverName, $connectionInfo);
+
+      if( $conn === false ) {
+        die( print_r( sqlsrv_errors(), true));
+      }
+
+      $stmt = sqlsrv_query( $conn, "SELECT * FROM VoteOptions");
+
+      if( $stmt === false ) {
+        die( print_r( sqlsrv_errors(), true));
+      }
+      ?>
+      <form id="voteform" name="voteform" method="POST" action="vote.php">
+      <?php
+        while( $row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC) ) {
+          echo "<button name=\"vote\" type=\"submit\" value=\"".$row['OptionName']."\">".$row['OptionName']."</button>\n";
+        }
+      ?>
+      </form>
+      <?php
+        print "<small>Processed by ".gethostname()."</small>\n";
+      ?>
+  - owner: www-data:www-data
+    path: /site/result.php
+    content: |
+      <h1>Voting Time! Which one you like most?</h1>
+      <h2>Results so far</h2>
+      <?php
+
+        // put the connection string here
+        $connectionInfo = array("UID" => "demouserdb", "pwd" => "DemoPasswordDB-2021", "Database" => "vnexamdb", "LoginTimeout" => 30, "Encrypt" => 1, "TrustServerCertificate" => 0);
+        $serverName = "tcp:vnexamsqlsrv.database.windows.net,1433";
+        $conn = sqlsrv_connect($serverName, $connectionInfo);
+
+        if( $conn === false ) {
+          die( print_r( sqlsrv_errors(), true));
+        }
+
+        $stmt = sqlsrv_query( $conn, "SELECT VoteOption, COUNT(*) VoteCnt FROM VoteCasts GROUP BY VoteOption ORDER BY 2 DESC");
+
+        if( $stmt === false ) {
+          die( print_r( sqlsrv_errors(), true));
+        }
+      ?>
+      <ol>
+      <?php
+        while( $row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC) ) {
+          echo "<li>".$row['VoteOption']." (".$row['VoteCnt'].")</li>\n";
+        }
+      ?>
+      </ol>
+      <?php
+        print "<small>Processed by ".gethostname()."</small>\n";
+      ?>
+  - owner: www-data:www-data
+    path: /site/vote.php
+    content: |
+      <?php 
+      if (!isset($_POST['vote']))
+        header('Location: index.php');
+
+      // put the connection string here
+      $connectionInfo = array("UID" => "demouserdb", "pwd" => "DemoPasswordDB-2021", "Database" => "vnexamdb", "LoginTimeout" => 30, "Encrypt" => 1, "TrustServerCertificate" => 0);
+      $serverName = "tcp:vnexamsqlsrv.database.windows.net,1433";
+      $conn = sqlsrv_connect($serverName, $connectionInfo);
+
+      if( $conn === false ) {
+        die( print_r( sqlsrv_errors(), true));
+      }
+
+      $stmt = sqlsrv_query( $conn, "INSERT INTO VoteCasts (VoteOption) VALUES ('".$_POST['vote']."')");
+
+      if( $stmt === false ) {
+        die( print_r( sqlsrv_errors(), true));
+      }
+      
+      header('Location: result.php');
+      ?>
